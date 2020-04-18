@@ -94,6 +94,55 @@ int grad_f(const gsl_vector *x, void *params, gsl_vector *f)
 	return GSL_SUCCESS;
 }
 
+int grad_df(const gsl_vector *x, void *params, gsl_matrix *J)
+{
+	double K = ((struct grad_params *)params)->K;
+	double m[3];
+	double a[6];
+
+	int n = 7;
+
+	for(int i=0; i<3; i++)
+		m[i] = ((struct grad_params *)params)->m[i];
+
+	for(int i=0; i<6; i++)
+		a[i] = ((struct grad_params *)params)->a[i];
+
+	gsl_multiroot_function f = {&grad_f, n, params};
+
+	gsl_vector *f_vec = gsl_vector_alloc(n);
+	grad_f(x,params,f_vec);
+	gsl_multiroot_fdjacobian (&f, x, f_vec, GSL_SQRT_DBL_EPSILON, J);
+
+	gsl_matrix_set(J, 0, 6, -gsl_vector_get(x, 1));
+	gsl_matrix_set(J, 1, 6,  gsl_vector_get(x, 0));
+	gsl_matrix_set(J, 2, 6, -gsl_vector_get(x, 3));
+	gsl_matrix_set(J, 3, 6,  gsl_vector_get(x, 2));
+	gsl_matrix_set(J, 4, 6, -gsl_vector_get(x, 5));
+	gsl_matrix_set(J, 5, 6,  gsl_vector_get(x, 4));
+	gsl_matrix_set(J, 6, 6,  0.0);
+
+	/*
+	fprintf(stderr, "JACOBIAN:\n");
+	for(int i=0; i<n; i++)
+	{
+		for(int k=0; k<n; k++)
+			fprintf(stderr, "% .14e ", gsl_matrix_get(J,i,k));
+		fprintf(stderr, "\n");
+	}
+	*/
+
+	return(GSL_SUCCESS);
+}
+
+int grad_fdf(const gsl_vector *x, void *params, gsl_vector *f, gsl_matrix *J)
+{
+	grad_f(x, params, f);
+	grad_df(x, params, J);
+
+	return(GSL_SUCCESS);
+}
+
 int
 print_state (size_t iter, gsl_multiroot_fsolver * s)
 {
@@ -119,15 +168,36 @@ print_state (size_t iter, gsl_multiroot_fsolver * s)
 
 int main( )
 {
-//	double m[3] = {sqrt(3), sqrt(3), sqrt(3)};
-	double m[3] = {1, 1, 1};
+	// Lagrange's equilateral RE, equal masses m1=m2=m3=sqrt(3)
+	// double m[3] = {sqrt(3), sqrt(3), sqrt(3)};
+	// double alpha = 0.5;
 
-//	double alpha = 0.5;
-	double alpha = 0.5*cbrt(1.0/sqrt(3.0));
+	// Lagrange's equilateral RE, equal masses m1=m2=m3=1
+	// double m[3] = {1, 1, 1};
+	// double alpha = 0.5*cbrt(1.0/sqrt(3.0));
+
+	// Lagrange's equilateral RE, different masses m1=1, m2=2, m3=3
+	double m[3] = {1, 2, 3};
+	//double alpha = 2.0;
+	//double alpha = 0.5*cbrt(2.0)*cbrt(1.0/sqrt(3.0));
 
 	// positions (x_j, y_j) for each of the 3 bodies.
-	double a[6] = {alpha, 0, -alpha/2, sqrt(3)*alpha/2, -alpha/2,
-		-sqrt(3)*alpha/2};
+
+	// Lagrange's equilateral RE, equal masses
+	//double a[6] = {alpha, 0, -alpha/2, sqrt(3)*alpha/2, -alpha/2,
+	//	-sqrt(3)*alpha/2};
+
+	// Lagrange's equilateral RE, different masses m1=1, m2=2, m3=3
+	//double phi = atan(3.0*sqrt(3.0)/7.0);	// Argument of second mass
+	double tau = cbrt(6)/2.0;		// length of side of eq triangle
+	/*
+	double a[6] = {alpha, 0,	// z_1
+		tau*cos(phi) + alpha, tau*sin(phi), // z_2
+		tau*cos(phi + M_PI/3.0) + alpha, tau*sin(phi + M_PI/3.0)};	// z_3
+		*/
+	double a[6] = {0.655696914638530, 0.0757133580346725, 
+		-0.131139382927706, 0.529993506242707, 
+		-0.131139382927706, -0.378566790173362};
 
 	double kappa;	// curvature
 
@@ -153,8 +223,8 @@ int main( )
 	}
 	*/
 
-	int num_K = 50;
-	double delta_K = -0.5/num_K;
+	int num_K = 200;
+	double delta_K = -2.0/num_K;
 
 	const size_t n = 7;
 	int i;
@@ -168,8 +238,8 @@ int main( )
 	{
 		kappa = j*delta_K;
 
-		const gsl_multiroot_fsolver_type *T;
-		gsl_multiroot_fsolver *s;
+		const gsl_multiroot_fdfsolver_type *T;
+		gsl_multiroot_fdfsolver *s;	
 
 		int status;
 		size_t iter = 0;
@@ -181,25 +251,25 @@ int main( )
 		for(int i=0; i<6; i++)
 			p.a[i] = a[i];
 
-		gsl_multiroot_function f = {&grad_f, n, &p};
+		gsl_multiroot_function_fdf f = {&grad_f, &grad_df, &grad_fdf, n, &p};
 
 		gsl_vector *x = gsl_vector_alloc (n);
 
 		for(i=0; i<n; i++)
 			gsl_vector_set (x, i, x_init[i]);
 
-		T = gsl_multiroot_fsolver_hybrid;
-		s = gsl_multiroot_fsolver_alloc (T, n);
-		gsl_multiroot_fsolver_set (s, &f, x);
+		T = gsl_multiroot_fdfsolver_newton;
+		s = gsl_multiroot_fdfsolver_alloc (T, n);
+		gsl_multiroot_fdfsolver_set (s, &f, x);
 
-		print_state (iter, s);
+		//print_state (iter, s);
 
 		do
 			{
 			  iter++;
-			  status = gsl_multiroot_fsolver_iterate (s);
+			  status = gsl_multiroot_fdfsolver_iterate (s);
 
-			  print_state (iter, s);
+			  //print_state (iter, s);
 
 			  if (status)   /* check if solver is stuck */
 				break;
@@ -212,7 +282,7 @@ int main( )
 		fprintf (stderr, "status = %s\n", gsl_strerror (status));
 
 		// Output relative equilibrium
-		printf ("% .3f % .5f % .5f % .5f % .5f % .5f % .5f % .5f\n",
+		printf ("% .10f % .10f % .10f % .10f % .10f % .10f % .10f % .10f\n",
 				kappa,
 				gsl_vector_get (s->x, 0),
 				gsl_vector_get (s->x, 1),
@@ -226,7 +296,7 @@ int main( )
 		for(i=0; i<n; i++)
 			x_init[i] = gsl_vector_get (s->x, i);
 
-		gsl_multiroot_fsolver_free (s);
+		gsl_multiroot_fdfsolver_free (s);
 		gsl_vector_free (x);
 	}
 

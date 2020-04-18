@@ -1,4 +1,4 @@
-#set out "RE_cont.eps"
+#set out "RE.eps"
 #set term post eps color
 
 set size square
