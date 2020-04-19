@@ -144,7 +144,7 @@ int grad_fdf(const gsl_vector *x, void *params, gsl_vector *f, gsl_matrix *J)
 }
 
 int
-print_state (size_t iter, gsl_multiroot_fsolver * s)
+print_state (size_t iter, gsl_multiroot_fdfsolver * s)
 {
   fprintf (stderr, "iter = %3lu\n"
 		  "x = % .5f % .5f % .5f % .5f % .5f % .5f % .5f\n"
@@ -169,12 +169,12 @@ print_state (size_t iter, gsl_multiroot_fsolver * s)
 int main( )
 {
 	// Lagrange's equilateral RE, equal masses m1=m2=m3=sqrt(3)
-	// double m[3] = {sqrt(3), sqrt(3), sqrt(3)};
-	// double alpha = 0.5;
+	//double m[3] = {sqrt(3), sqrt(3), sqrt(3)};
+	//double alpha = 0.5;
 
 	// Lagrange's equilateral RE, equal masses m1=m2=m3=1
-	// double m[3] = {1, 1, 1};
-	// double alpha = 0.5*cbrt(1.0/sqrt(3.0));
+	//double m[3] = {1, 1, 1};
+	//double alpha = 0.5*cbrt(1.0/sqrt(3.0));
 
 	// Lagrange's equilateral RE, different masses m1=1, m2=2, m3=3
 	double m[3] = {1, 2, 3};
@@ -188,13 +188,7 @@ int main( )
 	//	-sqrt(3)*alpha/2};
 
 	// Lagrange's equilateral RE, different masses m1=1, m2=2, m3=3
-	//double phi = atan(3.0*sqrt(3.0)/7.0);	// Argument of second mass
 	double tau = cbrt(6)/2.0;		// length of side of eq triangle
-	/*
-	double a[6] = {alpha, 0,	// z_1
-		tau*cos(phi) + alpha, tau*sin(phi), // z_2
-		tau*cos(phi + M_PI/3.0) + alpha, tau*sin(phi + M_PI/3.0)};	// z_3
-		*/
 	double a[6] = {0.655696914638530, 0.0757133580346725, 
 		-0.131139382927706, 0.529993506242707, 
 		-0.131139382927706, -0.378566790173362};
@@ -223,8 +217,8 @@ int main( )
 	}
 	*/
 
-	int num_K = 200;
-	double delta_K = -2.0/num_K;
+	int num_K = 50;
+	double delta_K = 0.5/num_K;
 
 	const size_t n = 7;
 	int i;
@@ -258,7 +252,7 @@ int main( )
 		for(i=0; i<n; i++)
 			gsl_vector_set (x, i, x_init[i]);
 
-		T = gsl_multiroot_fdfsolver_newton;
+		T = gsl_multiroot_fdfsolver_hybridsj;
 		s = gsl_multiroot_fdfsolver_alloc (T, n);
 		gsl_multiroot_fdfsolver_set (s, &f, x);
 
@@ -269,20 +263,25 @@ int main( )
 			  iter++;
 			  status = gsl_multiroot_fdfsolver_iterate (s);
 
-			  //print_state (iter, s);
 
 			  if (status)   /* check if solver is stuck */
 				break;
 
 			  status =
-				gsl_multiroot_test_residual (s->f, 1e-10);
+				gsl_multiroot_test_residual (s->f, 1e-13);
 			}
 		while (status == GSL_CONTINUE && iter < 1000);
 
 		fprintf (stderr, "status = %s\n", gsl_strerror (status));
 
+		if (status)   /* check if solver is stuck */
+		{
+			print_state (iter, s);
+			exit(EXIT_FAILURE);
+		}
+
 		// Output relative equilibrium
-		printf ("% .10f % .10f % .10f % .10f % .10f % .10f % .10f % .10f\n",
+		printf ("% .2f % .14f % .14f % .14f % .14f % .14f % .14f % .14f\n",
 				kappa,
 				gsl_vector_get (s->x, 0),
 				gsl_vector_get (s->x, 1),
