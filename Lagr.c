@@ -217,8 +217,8 @@ int main( )
 	}
 	*/
 
-	int num_K = 50;
-	double delta_K = 0.5/num_K;
+	int num_K = 10000;
+	double delta_K = -100.0/num_K;
 
 	const size_t n = 7;
 	int i;
