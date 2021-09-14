@@ -11,6 +11,9 @@
 #include <assert.h>
 #include <gsl/gsl_errno.h>  // GSL_SUCCESS
 
+#include <gsl/gsl_matrix.h>
+#include <gsl/gsl_linalg.h>		// To compute determinant of matrix
+#include <gsl/gsl_eigen.h>		// To compute eigenvalues of matrix
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_multiroots.h>
 
@@ -49,6 +52,12 @@ double pd_V_yk(double xj, double yj, double xk, double yk, double K);
 
 /** Dot (inner) product of u and v */
 double dot(double u[2], double v[2]);
+
+/** Print eigenvalues of matrix A **/
+void eigenvalues(gsl_matrix *A, int inPlace);
+
+/** Determinant of matrix A **/
+double det_get(gsl_matrix *A, int inPlace);
 
 struct grad_params
 {
@@ -99,6 +108,7 @@ int grad_df(const gsl_vector *x, void *params, gsl_matrix *J)
 	double K = ((struct grad_params *)params)->K;
 	double m[3];
 	double a[6];
+	double det;	// determinant of Jac(grad_L)
 
 	int n = 7;
 
@@ -122,7 +132,6 @@ int grad_df(const gsl_vector *x, void *params, gsl_matrix *J)
 	gsl_matrix_set(J, 5, 6,  gsl_vector_get(x, 4));
 	gsl_matrix_set(J, 6, 6,  0.0);
 
-	/*
 	fprintf(stderr, "JACOBIAN:\n");
 	for(int i=0; i<n; i++)
 	{
@@ -130,7 +139,14 @@ int grad_df(const gsl_vector *x, void *params, gsl_matrix *J)
 			fprintf(stderr, "% .14e ", gsl_matrix_get(J,i,k));
 		fprintf(stderr, "\n");
 	}
-	*/
+
+	// Compute determinant (in place).
+	// det = det_get(J, 1);	
+	// fprintf(stderr, "det(JACOBIAN): %f\n", det);
+
+	// Compute eigenvalues of A (not in place)
+	fprintf(stderr, "eigenvals(JACOBIAN):\n");
+	eigenvalues(J, 0);
 
 	return(GSL_SUCCESS);
 }
@@ -173,25 +189,30 @@ int main( )
 	//double alpha = 0.5;
 
 	// Lagrange's equilateral RE, equal masses m1=m2=m3=1
-	//double m[3] = {1, 1, 1};
-	//double alpha = 0.5*cbrt(1.0/sqrt(3.0));
+	double m[3] = {1, 1, 1};
+	double alpha = 0.5*cbrt(1.0/sqrt(3.0));
 
 	// Lagrange's equilateral RE, different masses m1=1, m2=2, m3=3
-	double m[3] = {1, 2, 3};
+	//double m[3] = {1, 2, 3};
+
+	// alpha not used in the case of m1=1, m2=2, m3=3
 	//double alpha = 2.0;
 	//double alpha = 0.5*cbrt(2.0)*cbrt(1.0/sqrt(3.0));
 
 	// positions (x_j, y_j) for each of the 3 bodies.
 
 	// Lagrange's equilateral RE, equal masses
-	//double a[6] = {alpha, 0, -alpha/2, sqrt(3)*alpha/2, -alpha/2,
-	//	-sqrt(3)*alpha/2};
+	double a[6] = {alpha, 0, -alpha/2, sqrt(3)*alpha/2, -alpha/2,
+		-sqrt(3)*alpha/2};
 
 	// Lagrange's equilateral RE, different masses m1=1, m2=2, m3=3
-	double tau = cbrt(6)/2.0;		// length of side of eq triangle
-	double a[6] = {0.655696914638530, 0.0757133580346725, 
-		-0.131139382927706, 0.529993506242707, 
-		-0.131139382927706, -0.378566790173362};
+
+	// tau not used anymore...
+	//double tau = cbrt(6)/2.0;		// length of side of eq triangle
+
+	//double a[6] = {0.655696914638530, 0.0757133580346725, 
+	//	-0.131139382927706, 0.529993506242707, 
+	//	-0.131139382927706, -0.378566790173362};
 
 	double kappa;	// curvature
 
@@ -218,7 +239,7 @@ int main( )
 	*/
 
 	int num_K = 10000;
-	double delta_K = -100.0/num_K;
+	double delta_K = 100.0/num_K;
 
 	const size_t n = 7;
 	int i;
@@ -269,6 +290,9 @@ int main( )
 
 			  status =
 				gsl_multiroot_test_residual (s->f, 1e-13);
+
+
+			  print_state (iter, s);
 			}
 		while (status == GSL_CONTINUE && iter < 1000);
 
@@ -281,7 +305,7 @@ int main( )
 		}
 
 		// Output relative equilibrium
-		printf ("% .2f % .14f % .14f % .14f % .14f % .14f % .14f % .14f\n",
+		printf ("% .3f % .14f % .14f % .14f % .14f % .14f % .14f % .14f\n",
 				kappa,
 				gsl_vector_get (s->x, 0),
 				gsl_vector_get (s->x, 1),
@@ -605,3 +629,97 @@ double dot(double u[2], double v[2])
 	return u[0]*v[0] + u[1]*v[1];
 }
 
+void eigenvalues(gsl_matrix *A, int inPlace) {
+
+/*
+  inPlace = 1 => A is replaced
+  inPlace = 0 => A is retained
+*/
+
+   gsl_matrix *tmpA;
+
+   if (inPlace)
+      tmpA = A;
+   else {
+     tmpA = gsl_matrix_alloc(A->size1, A->size2);
+     gsl_matrix_memcpy(tmpA , A);
+   }
+
+  int n = tmpA->size1;
+
+  gsl_vector_complex *eval = gsl_vector_complex_alloc (n);
+  gsl_matrix_complex *evec = gsl_matrix_complex_alloc (n, n);
+
+  gsl_eigen_nonsymmv_workspace * w =
+    gsl_eigen_nonsymmv_alloc (n);
+
+  gsl_eigen_nonsymmv (tmpA, eval, evec, w);
+
+  gsl_eigen_nonsymmv_free (w);
+
+  gsl_eigen_nonsymmv_sort (eval, evec,
+                           GSL_EIGEN_SORT_ABS_DESC);
+
+  {
+    int i, j;
+
+    for (i = 0; i < n; i++)
+      {
+        gsl_complex eval_i
+           = gsl_vector_complex_get (eval, i);
+        gsl_vector_complex_view evec_i
+           = gsl_matrix_complex_column (evec, i);
+
+        fprintf (stderr, "eigenvalue = %g + %gi\n",
+                GSL_REAL(eval_i), GSL_IMAG(eval_i));
+/*
+        printf ("eigenvector = \n");
+        for (j = 0; j < n; ++j)
+          {
+            gsl_complex z =
+              gsl_vector_complex_get(&evec_i.vector, j);
+            printf("%g + %gi\n", GSL_REAL(z), GSL_IMAG(z));
+          }
+*/
+      }
+  }
+
+  gsl_vector_complex_free(eval);
+  gsl_matrix_complex_free(evec);
+
+  if (! inPlace)
+    gsl_matrix_free(tmpA);
+}
+
+// Not used anymore
+double det_get(gsl_matrix *A, int inPlace) {
+
+/*
+  inPlace = 1 => A is replaced with the LU decomposed copy.
+  inPlace = 0 => A is retained, and a copy is used for LU.
+*/
+
+   printf("A->size1 = %ld, A->size2 = %ld\n", A->size1, A->size2);
+
+   double det;
+   int signum;
+   gsl_permutation *p = gsl_permutation_alloc(A->size1);
+   gsl_matrix *tmpA;
+
+   if (inPlace)
+      tmpA = A;
+   else {
+     tmpA = gsl_matrix_alloc(A->size1, A->size2);
+     gsl_matrix_memcpy(tmpA , A);
+   }
+
+
+   gsl_linalg_LU_decomp(tmpA , p , &signum);
+   det = gsl_linalg_LU_det(tmpA , signum);
+   gsl_permutation_free(p);
+   if (! inPlace)
+      gsl_matrix_free(tmpA);
+
+   
+   return det;
+}
