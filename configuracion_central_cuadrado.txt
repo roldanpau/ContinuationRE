@@ -1,0 +1,13 @@
+Hola Pablo,
+
+Te envío la configuración central, hace falta multiplicar todo por un factor (1/2),
+x1 = 0
+x2 = 0
+x3 = -1
+x4 = 1
+
+m1 = 1/2, m2=m3=m4=1
+y1 = 1.329051655213158
+y2 = -1.082257923278815
+y3 = 0.208866047836118
+y4 = 0.208866047836118

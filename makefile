@@ -8,7 +8,7 @@ CFLAGS = -g
 LDFLAGS = -g
 LDLIBS = -lm -lgsl -lgslcblas
 
-all : Lagr
+all : Lagr cuadrado
 
 install : Lagr
 #	ar rv $(libdir)/libds.a ctbp.o
@@ -17,5 +17,7 @@ install : Lagr
 
 Lagr : Lagr.o
 
+cuadrado : cuadrado.o
+
 clean : 
-	rm Lagr Lagr.o
+	rm Lagr Lagr.o cuadrado cuadrado.o
