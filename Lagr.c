@@ -239,7 +239,7 @@ int main( )
 	*/
 
 	int num_K = 10000;
-	double delta_K = 100.0/num_K;
+	double delta_K = -200.0/num_K;
 
 	const size_t n = 7;
 	int i;
@@ -289,7 +289,7 @@ int main( )
 				break;
 
 			  status =
-				gsl_multiroot_test_residual (s->f, 1e-13);
+				gsl_multiroot_test_residual (s->f, 1e-12);
 
 
 			  print_state (iter, s);

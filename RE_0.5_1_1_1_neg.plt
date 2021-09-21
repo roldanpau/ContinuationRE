@@ -1,5 +1,5 @@
-#set out "RE_0.5_1_1_1_neg.eps"
-#set term post eps color
+set out "RE_0.5_1_1_1_neg.eps"
+set term post eps color
 
 set size ratio -1
 
@@ -22,6 +22,14 @@ set arrow 4 from -0.42801097159491,0.08939696006771,0 \
 to -0.00000000000000,0.56884869024927,0 nohead palette z
 
 set palette negative
+
+set label "  m1" at -0.00000000000000,0.56884869024927 left
+set label "  m2" at 0.42801097159491,0.08939696006771 left
+set label "  m3" at 0.00000000000000,-0.46321826526006 left
+set label "m4  " at -0.42801097159491,0.08939696006771 right
+
+set xrange [-0.6:0.6]
+set yrange [-0.6:0.6]
 
 plot \
 "RE_0.5_1_1_1_neg.res" u 2:3:1 not palette z pt 1, \
